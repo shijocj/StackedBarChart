@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>D3.js Stacked Bar Chart </title>
+  <script src="https://d3js.org/d3.v5.min.js"></script>
+  <script src="Base.js"></script>
+  <script src="Abstract.js"></script>
+  <script src="Constant.js"></script>
+  <script src="Scale.js"></script>
+  <script src="Axis.js"></script>
+  <script src="Util.js"></script>
+  <style>
+    .aviso-charts-tooltip {
+      position: absolute;
+      background-color: #fff;
+      padding: 2px;
+      border: 1px solid #000;
+      border-radius: 5px;
+      opacity: 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="container"></div>
+</body>
+<script>
+  var axis = [{
+      "dataIndex": "X0",
+      "scale": "ordinal",
+      "index": "X",
+      "title": "Quarters"
+    },
+    {
+      "dataIndex": "Y0",
+      "scale": "linear",
+      "index": "Y",
+      "title": "Sales in dollars",
+      "chartType": "BAR"
+    },
+    {
+      "dataIndex": "Y1",
+      "scale": "linear",
+      "index": "Y",
+      "title": "Average Time to Close",
+      "chartType": "LINE"
+    }
+  ];
+
+  var data = [{
+      "SEGMENT": [{
+          "data": [
+            ["2022Q4", 16720000],
+            ["2023Q1", 17720000],
+            ["2023Q2", 38720000],
+            ["2023Q3", 13720000],
+            ["2023Q4", 20720000]
+          ],
+          "groupIndex": "GrpA"
+        },
+        {
+          "data": [
+            ["2022Q4", 14280000],
+            ["2023Q1", 15280000],
+            ["2023Q2", 46280000],
+            ["2023Q3", 17280000],
+            ["2023Q4", 18280000]
+          ],
+          "groupIndex": "GrpB"
+        },
+        {
+          "data": [
+            ["2022Q4", 8160000],
+            ["2023Q1", 8260000],
+            ["2023Q2", 8360000],
+            ["2023Q3", 12460000],
+            ["2023Q4", 22560000]
+          ],
+          "groupIndex": "GrpC"
+        },
+        {
+          "data": [
+            ["2022Q4", 4760000],
+            ["2023Q1", 16560000],
+            ["2023Q2", 4660000],
+            ["2023Q3", 6760000],
+            ["2023Q4", 12860000]
+          ],
+          "groupIndex": "GrpD"
+        }
+      ],
+      "dataIndex": ["xaxis", "yaxis"]
+    },
+    {
+      "SEGMENT": [{
+        "data": [
+          ["2022Q4", 20],
+          ["2023Q1", 40],
+          ["2023Q2", 80],
+          ["2023Q3", 45],
+          ["2023Q4", 60]
+        ]
+      }],
+      "dataIndex": ["xaxis", "yaxis"]
+    }
+  ];
+
+  var config = {
+    "data": data,
+    "axis": axis,
+    "series": [{
+      xField: "X0",
+      yField: "Y0"
+    }, {
+      xField: "X0",
+      yField: "Y1"
+    }],
+    "dataIndex": ["X", "Y"],
+    'divId': 'container',
+    'width': 600,
+    'height': 500
+  };
+
+  //Method to generate chart
+  AvisoCharts.Chart(config);
+</script>
+
+</html>

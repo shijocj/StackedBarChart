@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>D3.js Stacked Bar chart</title>
+	<script src="https://d3js.org/d3.v5.min.js"></script>
+	<style>
+		.aviso-charts-tooltip {
+			position: absolute;
+			background-color: #fff;
+			padding: 2px;
+			border: 1px solid #000;
+			border-radius: 5px;
+			opacity: 0;
+		}
+	</style>
+</head>
+
+<body>
+	<div id="container"></div>
+</body>
+<script>
+	const WHITE_COLOR = "#ffffff";
+	const AXIS_CHART = "AxisChart";
+	const FONT_FAMILY = "Arial";
+	const FONT_SIZE = 11;
+	const TITLE_FONT_SIZE = 11;
+	const FONT_WEIGHT = 600;
+	const BLACK = '#000000';
+	const COLORS = ["#FF007F", "#90EE90", "#F0E68C", "#4169E1"];
+	const LINE_COLOR = "#00008B";
+	const AVISO_CHART_BAR_GRP = "aviso-bar-group";
+	const RECT = "rect";
+	const POINTER = "pointer";
+	const AVISO_CHART_MAIN_CLS = "aviso-charts-main";
+	const AVISO_CHART_SVG_CLS = "aviso-charts-svg";
+	const AVISO_CHART_SVG_ID = "aviso-charts-svg-";
+	const AVISO_CHART_BOUND_RECT = "aviso-charts-boundary-rect";
+	const AVISO_CHART_TPL_CLS = "aviso-charts-tooltip";
+	const AVISO_CHART_PATH_GRP = "aviso-chart-path-grp";
+	const AVISO_CHART_LINE = "aviso-charts-line";
+	const AVISO_CHART_CIRCLE_GRP = "aviso-chart-circle-grp";
+	const AVISO_CHART_CIRCLE = "aviso-charts-circle";
+	const AVISO_CHART_AXIS_CLS = 'aviso-charts-axis-xy';
+	const AVISO_CHART_AXIS_X0 = 'aviso-charts-axis-X0';
+	const AVISO_CHART_AXIS_HEADER = "aviso-charts-title-xy";
+	const AVISO_CHART_AXIS_X0_TITLE = "aviso-charts-x0-axis-title";
+	const AVISO_CHART_AXIS_Y0 = "aviso-charts-axis-Y0";
+	const AVISO_CHART_AXIS_Y0_TITLE = "aviso-charts-Y0-axis-title";
+	const AVISO_CHART_LEGEND_GRP = "aviso-chart-legend-grp";
+	const AVISO_CHART_HEADER_CLS = "aviso-chart-header";
+	const LEGEND_TEXT_WIDTH = 60;
+	const LEGEND_RECT_SIZE = 16;
+	const X_AXIS_TITLE = "Quarters";
+	const Y_AXIS_TITLE = "Revenue";
+	const AVISO_CHART_TITLE = "Oppty. Quarter End Date";
+	const RADIUS = 5;
+	const OPACITY = 1;
+	const NONE = "none";
+	const QUARTER_TPL = "Quarter: ";
+	const GROUP_TPL = "Group: ";
+	const VALUE_TPL = "Value: ";
+	const REV_GROWTH_TPL = "RevenueGrowth: ";
+	const BREAK = "<br>";
+
+
+
+	/**
+	 * Class helps to create global namespace for AvisoCharts library.
+	 * @property AvisoCharts
+	 */
+	var AvisoCharts = AvisoCharts || {};
+
+	/**
+	 * Function helps to create chart with the specified configuration.
+	 * @method AvisoCharts.StackedBarChart
+	 * @constructor
+	 * @param {Object} args
+	 */
+	AvisoCharts.StackedBarChart = function (args) {
+		if (!(this instanceof AvisoCharts.StackedBarChart))
+			return new AvisoCharts.StackedBarChart(args);
+
+		this.data = args.data || [];
+		this.divId = args.divId || "chart";
+		this.W = Number(args.width) || 500;
+		this.H = Number(args.height) || 500;
+		this.legendGroup = args.legendGroup || [];
+		this.lineIndex = args.lineIndex || "";
+		this.initCharts();
+	}
+	/**
+	 * method helps to initialise charts.
+	 * @method initCharts
+	 */
+	AvisoCharts.StackedBarChart.prototype.initCharts = function () {
+		var me = this;
+		try {
+			me.setData();
+			me.setMargin();
+			me.setSVG();
+			me.setScale();
+			me.setAxis();
+			me.drawStackedBar();
+			me.drawLine();
+			me.drawCircles();
+			me.setLegend();
+			me.setChartTitle();
+		} catch (err) {
+			console.log(err.message);
+		}
+	};
+	/**
+	 *	Method helps to set scale for x, y axis.
+	 *	@method setScale
+	 */
+	AvisoCharts.StackedBarChart.prototype.setScale = function () {
+		var me = this,
+			data = me.transformedData,
+			categories = me.legendGroup;
+		try {
+			var domainX = data.map(function (d) {
+					return d.category
+				}),
+				domainY = [0, d3.max(data, function (d) {
+					return d3.sum(categories, function (groupIndex) {
+						return d[groupIndex]
+					})
+				})];
+
+			// set x scale
+			me.xScale = d3.scaleBand()
+				.domain(domainX)
+				.range([0, me.width])
+				.padding(0.1);
+
+			// set y scale
+			me.yScale = d3.scaleLinear()
+				.domain(domainY)
+				.range([me.height, 0]);
+
+			// color scale for different groups
+			me.colorScale = d3.scaleOrdinal()
+				.domain(categories)
+				.range(COLORS);
+		} catch (e) {
+			console.log(e.message);
+		}
+	};
+
+	/**
+	 *	Method helps to transform data to render chat.
+	 *	@method setData
+	 */
+	AvisoCharts.StackedBarChart.prototype.setData = function () {
+		var me = this,
+			data = me.data,
+			categories = Object.keys(data[0][Object.keys(data[0])[0]]);
+		try {
+			// data used to create stacks 
+			me.transformedData = me.data.map(entry => {
+				var category = Object.keys(entry)[0];
+				var values = entry[category];
+				var result = {
+					category: category
+				};
+				me.legendGroup.forEach(groupIndex => {
+					result[groupIndex] = values[groupIndex];
+				});
+				return result;
+			});
+			// data used to render line and circles
+			me.chartData = me.data.map(entry => {
+				var category = Object.keys(entry)[0];
+				var values = entry[category];
+				var result = {
+					category: category
+				};
+				categories.forEach(groupIndex => {
+					result[groupIndex] = values[groupIndex];
+				});
+				return result;
+			});
+		} catch (e) {
+			console.log(e.message);
+		}
+	};
+	/**
+	 * Method helps to create stacked bar chart.
+	 * @method drawStackedBar
+	 */
+	AvisoCharts.StackedBarChart.prototype.drawStackedBar = function () {
+		var me = this,
+			data = me.transformedData,
+			categories = me.legendGroup;
+		try {
+			var stackedData = d3.stack().keys(categories)(data),
+				barWidth = me.xScale.bandwidth() > 50 ? 50 : me.xScale.bandwidth(),
+				pos = (me.xScale.bandwidth() - barWidth) / 2;
+
+			me.svgGroup.selectAll("." + AVISO_CHART_BAR_GRP)
+				.data(stackedData)
+				.enter().append("g")
+				.attr("class", AVISO_CHART_BAR_GRP)
+				.attr("fill", function (d) {
+					return me.colorScale(d.key)
+				})
+				.attr("key-index", function (d) {
+					return d.key;
+				})
+				.selectAll(RECT)
+				.data(function (d) {
+					return d;
+				})
+				.enter().append(RECT)
+				.attr("x", function (d) {
+					return barWidth == 50 ? pos + me.xScale(d.data.category) : me.xScale(d.data.category);
+				})
+				.attr("width", barWidth)
+				.attr("y", function (d) {
+					return me.yScale(d[1])
+				})
+				.attr("height", function (d) {
+					return me.yScale(d[0]) - me.yScale(d[1])
+				})
+				.style("cursor", POINTER)
+				.on("mouseover", function (d) {
+					me.showTooltip(this, d);
+				})
+				.on("mouseout", function () {
+					me.hideTooltip();
+				});
+		} catch (e) {
+			console.log(e.message);
+		}
+	};
+
+	/**
+	 * Method helps to draw line chart.
+	 * @method drawLine
+	 */
+	AvisoCharts.StackedBarChart.prototype.drawLine = function () {
+		var me = this,
+			data = me.chartData;
+		try {
+			var line = d3.line()
+				.x(function (d) {
+					return me.xScale(d.category) + me.xScale.bandwidth() / 2;
+				})
+				.y(function (d) {
+					return me.yScale(d.revenueGrowth)
+				});
+
+			// Draw the line chart for revenueGrowth
+			me.svgGroup.append("g")
+				.attr("class", AVISO_CHART_PATH_GRP)
+				.append("path")
+				.datum(data)
+				.attr("class", AVISO_CHART_LINE)
+				.attr("fill", NONE)
+				.attr("stroke", LINE_COLOR)
+				.attr("stroke-width", 2)
+				.attr("d", line);
+		} catch (e) {
+			console.log(e.message);
+		}
+	};
+
+	/**
+	 * Method helps to draw circles.
+	 * @method drawCircles
+	 */
+	AvisoCharts.StackedBarChart.prototype.drawCircles = function () {
+		var me = this,
+			data = me.chartData;
+		try {
+			// Draw circles for revenueGrowth
+			me.svgGroup.append("g")
+				.attr("class", AVISO_CHART_CIRCLE_GRP)
+				.selectAll(".circle")
+				.data(data)
+				.enter().append("circle")
+				.attr("class", AVISO_CHART_CIRCLE)
+				.attr("cx", function (d) {
+					return me.xScale(d.category) + (me.xScale.bandwidth() / 2)
+				})
+				.attr("cy", function (d) {
+					return me.yScale(d.revenueGrowth)
+				})
+				.attr("r", RADIUS)
+				.style("stroke", function (d) {
+					return me.colorScale(d.key);
+				})
+				.style("fill", WHITE_COLOR)
+				.style("cursor", POINTER)
+				.on("mouseover", function (d) {
+					me.showTooltip(this, d);
+				})
+				.on("mouseout", function () {
+					me.hideTooltip();
+				});
+
+		} catch (e) {
+			console.log(e.message);
+		}
+	};
+
+	/**
+	 * Method helps to create x, y axis component.
+	 * @method setAxis
+	 */
+	AvisoCharts.StackedBarChart.prototype.setAxis = function () {
+		var me = this,
+			xAxisCfg,
+			yAxisCfg;
+		try {
+			xAxisCfg = d3.axisBottom(me.xScale).tickSizeInner(5).tickSizeOuter(7);
+			// Draw the x-axis
+			me.svgGroup.append("g")
+				.attr("class", AVISO_CHART_AXIS_CLS + " " + AVISO_CHART_AXIS_X0)
+				.attr("transform", "translate( " + 0 + "," + me.height + ")")
+				.style("font-family", FONT_FAMILY)
+				.style("fill", NONE)
+				.style("font-size", FONT_SIZE + "px")
+				.call(xAxisCfg);
+
+			var txtpos = me.getTextWidth(X_AXIS_TITLE),
+				pos = me.width / 2 - txtpos / 2;
+			// set x axis title
+			me.svgGroup.append("g")
+				.attr("class", AVISO_CHART_AXIS_HEADER + " " + AVISO_CHART_AXIS_X0_TITLE)
+				.append("text")
+				.attr("transform", "translate(" + (pos) + " ," + ((me.height + me.margin.bottom) - 5) + ")")
+				.style("font-family", FONT_FAMILY)
+				.style("fill", BLACK)
+				.style("font-size", TITLE_FONT_SIZE + "px")
+				.attr("font-weight", FONT_WEIGHT)
+				.style("cursor", POINTER)
+				.style("opacity", OPACITY)
+				.text(X_AXIS_TITLE);
+
+			yAxisCfg = d3.axisLeft(me.yScale).tickSizeInner(5).tickSizeOuter(7).tickFormat(d3.format("($.2s"));
+			// Draw the y-axis
+			me.svgGroup.append("g")
+				.attr("class", AVISO_CHART_AXIS_CLS + " " + AVISO_CHART_AXIS_Y0)
+				.attr("transform", "translate( " + 0 + "," + 0 + ")")
+				.style("font-family", FONT_FAMILY)
+				.style("font-size", FONT_SIZE + "px")
+				.style("fill", NONE)
+				.call(yAxisCfg);
+
+			var height = me.height - 10,
+				yPos = me.margin.left - 5;
+			txtpos = me.getTextWidth(Y_AXIS_TITLE);
+			pos = (height / 2 + txtpos / 2) > height ? height : (height / 2 + txtpos / 2);
+			// set y axis title
+			me.svgGroup.append("g")
+				.attr("class", AVISO_CHART_AXIS_HEADER + " " + AVISO_CHART_AXIS_Y0_TITLE)
+				.append("text")
+				.attr("transform", "rotate(-90)")
+				.attr("y", -yPos)
+				.attr("x", -(pos))
+				.attr("dy", "1em")
+				.style("font-family", FONT_FAMILY)
+				.style("fill", BLACK)
+				.style("font-size", TITLE_FONT_SIZE + "px")
+				.attr("font-weight", FONT_WEIGHT)
+				.style("cursor", POINTER)
+				.style("opacity", OPACITY)
+				.text(Y_AXIS_TITLE);
+		} catch (e) {
+			console.log(e.message);
+		}
+	};
+	/**
+	 * Method helps to set legend for chart.
+	 * @method setLegend
+	 */
+	AvisoCharts.StackedBarChart.prototype.setLegend = function () {
+		var me = this;
+		try {
+			// Draw legend
+			var legend = me.svgGroup.append("g")
+				.attr("class", AVISO_CHART_LEGEND_GRP)
+				.attr("transform", "translate(" + (me.width / 2) + ", -30)");
+
+			legend.selectAll(RECT)
+				.data(me.legendGroup)
+				.enter().append(RECT)
+				.attr("x", function (d, i) {
+					return i * LEGEND_TEXT_WIDTH;
+				})
+				.attr("width", LEGEND_RECT_SIZE)
+				.attr("height", LEGEND_RECT_SIZE)
+				.style("fill", function (d) {
+					return me.colorScale(d)
+				});
+
+			legend.selectAll("text")
+				.data(me.legendGroup)
+				.enter().append("text")
+				.attr("x", function (d, i) {
+					return i * LEGEND_TEXT_WIDTH + 20;
+				})
+				.attr("y", 9)
+				.attr("dy", ".35em")
+				.text(function (d) {
+					return d;
+				})
+				.style("font-family", FONT_FAMILY)
+				.style("font-size", TITLE_FONT_SIZE + "px");
+		} catch (e) {
+			console.log(e.message);
+		}
+	};
+	/**
+	 * Method helps to set title for chart.
+	 * @method setChartTitle
+	 */
+	AvisoCharts.StackedBarChart.prototype.setChartTitle = function () {
+		var me = this;
+		try {
+			var chartTitle = me.svgGroup.append("g")
+				.attr("class", AVISO_CHART_HEADER_CLS)
+				.attr("transform", "translate(" + (10) + ", -20)");
+
+			chartTitle.append("text")
+				.text(AVISO_CHART_TITLE)
+				.attr("font-weight", FONT_WEIGHT)
+				.style("font-family", FONT_FAMILY)
+				.style("font-size", TITLE_FONT_SIZE + "px");
+
+		} catch (e) {
+			console.log(e.message);
+		}
+	};
+	/**
+	 *  Method helps to set the margin for the svg
+	 *	@method	setMargin
+	 */
+	AvisoCharts.StackedBarChart.prototype.setMargin = function () {
+		var me = this;
+		try {
+			me.margin = {
+				top: 40,
+				right: 60,
+				bottom: 40,
+				left: 60
+			};
+			me.width = me.W - (me.margin.left + me.margin.right);
+			me.height = me.H - (me.margin.top + me.margin.bottom);
+		} catch (err) {
+			console.log(err.message);
+		}
+	};
+	/**
+	 *	Method helps to set svg element
+	 *	@method setSVG
+	 */
+	AvisoCharts.StackedBarChart.prototype.setSVG = function () {
+		var me = this,
+			margin = me.margin,
+			chartHeight = me.H,
+			chartWidth = me.W;
+		try {
+			var maindiv = d3.select("#" + me.divId)
+				.append("div")
+				.attr('class', AVISO_CHART_MAIN_CLS);
+
+			me.svg = maindiv.append("svg")
+				.attr('class', AVISO_CHART_SVG_CLS)
+				.attr('id', AVISO_CHART_SVG_ID + me.divId);
+
+			me.svg.append(RECT)
+				.attr("x", 0)
+				.attr("y", 0)
+				.attr("height", chartHeight)
+				.attr("width", chartWidth)
+				.attr("class", AVISO_CHART_BOUND_RECT)
+				.style("fill", WHITE_COLOR);
+
+			me.svgGroup = me.svg
+				.attr('width', chartWidth)
+				.attr('height', chartHeight)
+				.attr('chartType', AXIS_CHART)
+				.append("g")
+				.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+			me.toolContr = maindiv.append("div")
+				.attr('class', AVISO_CHART_TPL_CLS)
+				.attr('id', AVISO_CHART_TPL_CLS + "-" + me.divId);
+		} catch (e) {
+			console.log(e.message);
+		}
+	};
+	/**
+	 * Method helps to show tooltip on mouse over
+	 * @method showTooltip
+	 * @param {HTML Object} cmp
+	 * @param {Object} d
+	 */
+	AvisoCharts.StackedBarChart.prototype.showTooltip = function (cmp, d) {
+		var me = this,
+			nodeName = cmp.tagName || cmp.nodeName,
+			event = d3.event,
+			textVal = "";
+		try {
+			if (nodeName == RECT) {
+				if (d.length && d[1]) {
+					var grpkey = cmp.parentNode.getAttribute("key-index"),
+						value = (d[1] - d[0]),
+						category = d.data && d.data.category || "";
+					textVal = QUARTER_TPL + category + BREAK + GROUP_TPL + grpkey + BREAK + VALUE_TPL + value;
+				}
+			} else {
+				if (d.revenueGrowth) {
+					textVal = QUARTER_TPL + d.category + BREAK + REV_GROWTH_TPL + d.revenueGrowth;
+				}
+			}
+			me.toolContr.html(textVal)
+				.style("left", (event.pageX + 10) + "px")
+				.style("top", (event.pageY - 10) + "px")
+				.style("opacity", 1);
+		} catch (e) {
+			console.log(e.message);
+		}
+	};
+	/**
+	 * Method helps to hide tooltip on mouse out
+	 * @method hideTooltip
+	 */
+	AvisoCharts.StackedBarChart.prototype.hideTooltip = function (d) {
+		var me = this;
+		try {
+			var tooltip = me.toolContr;
+			tooltip.style("opacity", 0);
+		} catch (e) {
+			console.log(e.message);
+		}
+	};
+	/**
+	 * Method helps to get the text width
+	 * @method getTextWidth
+	 * @param {String} text
+	 */
+	AvisoCharts.StackedBarChart.prototype.getTextWidth = function (text) {
+		try {
+			var tag = document.createElement("div");
+			tag.style.position = "absolute";
+			tag.style.left = "-999em";
+			tag.style.whiteSpace = "nowrap";
+			tag.innerHTML = text;
+			document.body.appendChild(tag);
+			var resultWidth = tag.clientWidth;
+			document.body.removeChild(tag);
+			return resultWidth;
+		} catch (err) {
+			console.log(err.message);
+		}
+	};
+
+
+
+
+	var data = [{
+			"2022Q4": {
+				"GrpA": 16720000,
+				"GrpB": 14280000,
+				"GrpC": 8160000,
+				"GrpD": 4760000,
+				"revenueGrowth": 25080000
+			}
+		},
+		{
+			"2023Q1": {
+				"GrpA": 17720000,
+				"GrpB": 15280000,
+				"GrpC": 8260000,
+				"GrpD": 16560000,
+				"revenueGrowth": 33540000
+			}
+		},
+		{
+			"2023Q2": {
+				"GrpA": 38720000,
+				"GrpB": 46280000,
+				"GrpC": 8360000,
+				"GrpD": 4660000,
+				"revenueGrowth": 68080000
+			}
+		},
+		{
+			"2023Q3": {
+				"GrpA": 13720000,
+				"GrpB": 17280000,
+				"GrpC": 12460000,
+				"GrpD": 6760000,
+				"revenueGrowth": 3400000
+			}
+		},
+		{
+			"2023Q4": {
+				"GrpA": 20720000,
+				"GrpB": 18280000,
+				"GrpC": 22560000,
+				"GrpD": 12860000,
+				"revenueGrowth": 63140000
+			}
+		}
+	];
+
+	var config = {
+		"data": data,
+		'divId': 'container',
+		'width': 600,
+		'height': 500,
+		"legendGroup": ["GrpA", "GrpB", "GrpC", "GrpD"],
+		"lineIndex": "revenueGrowth"
+	}
+
+	// Method helps to generate chart
+	AvisoCharts.StackedBarChart(config);
+</script>
+
+</html>
